@@ -1,0 +1,11 @@
+** how to get dataset?
+1. record_dataset_realtime_SR300.py
+record frames.
+
+2. random_partitioning.py
+partition the frames into 'train', 'test', 'train_blur', and 'test_blur'.
+
+3. makeDataset_ir_depth.py
+preprocess with grabcut.
+
+

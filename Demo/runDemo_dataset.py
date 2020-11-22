@@ -1,15 +1,14 @@
-import sys
-
-sys.path.append('/home/yong/dropbox/Dropbox-Uploader-master/gypark/')
-from HPE.src.model.deepPrior import dpnet
-from HIG.src.model.network import Pix2pix
+import os,sys,inspect
+currentdir=os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+basedir=currentdir+'\\..\\'
+sys.path.append(basedir)
+from HPE.model.deepPrior import dpnet
+from HIG.model.network import Pix2pix
 from Model.fusionNet import FusionNet
 
 from datasetloader.datasetLoader_uvr import DatasetLoader as datasetloader_UVR
 from GrabCut import Grabcut
-
-sys.path.append('/home/yong/dropbox/Dropbox-Uploader-master/gypark/Utility/')
-from visualize import Visualize_combined_outputs
+from Utility.visualize import Visualize_combined_outputs
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -27,18 +26,6 @@ import time
 
 from Udp import UDP
     
-def calculateDepthError(depth_pred,depth_train,d_min,d_max):
-    #error between depth images (original/predicted by pix2pix)
-    d_recon_pred=d_min+(d_max-d_min)*(depth_pred+1)/2
-    d_recon_gt=d_min+(d_max-d_min)*(depth_train+1)/2
-                
-    mask=d_recon_gt!=np.max(d_recon_gt)
-    dif_abs=abs(d_recon_gt[mask]-d_recon_pred[mask])
-    #dif_abs=abs(d_recon_gt-d_recon_pred)
-    depth_error=np.sum(dif_abs)/np.count_nonzero(mask)
-            
-    return depth_error
-
 def saveFingertip(filename,position):
     f = open(filename, 'w', encoding='utf-8', newline='')
     wr = csv.writer(f)
@@ -51,16 +38,15 @@ if __name__ == '__main__':
     args=parser.parse_args()
 
     #--user setting
-    #trained_modelFile_hpe1_orig='/home/yong/hdd/HPE/output/2020_2_26_11_29/trainedModel_epoch99.pth.tar'
-    trained_modelFile_hpe1_orig='/home/yong/hdd/HPE_refined/output/2020_4_20_13_25/trainedModel_epoch99.pth.tar'
+    #trained_modelFile_hpe1_orig='/home/yong/hdd/HPE_refined/output/2020_4_20_13_25/trainedModel_epoch99.pth.tar' 
+    trained_modelFile_hpe1_orig=basedir+'..\\HPE\\output\\2020_2_26_11_29\\trainedModel_epoch99.pth.tar'
+    trained_modelFile_hpe1=basedir+'..\\HIG\\output\\2020_3_31_22_4\\trainedModel_epoch98.pth.tar'
+    trained_modelFile_hig=basedir+'..\\HIG\\output\\2020_3_31_22_4\\trainedModel_epoch98.pth.tar'
+    trained_modelFile_hpe2=basedir+'..\\HPE2\\output\\2020_4_10_18_46\\trainedModel_epoch99.pth.tar'
     
-    trained_modelFile_hpe1='/home/yong/hdd/HIG/output/2020_3_31_22_4/trainedModel_epoch98.pth.tar'
-    trained_modelFile_hig='/home/yong/hdd/HIG/output/2020_3_31_22_4/trainedModel_epoch98.pth.tar'
-    trained_modelFile_hpe2='/home/yong/hdd/HPE2/output/2020_4_28_20_55/trainedModel_epoch199.pth.tar'
+    args.gpu_ids='0'
     
-    args.gpu_ids='1'
-    
-    dataset_name='v2' #'v1', 'v2' , 'test', 'test_blur'
+    dataset_name='test_blur' #'v1', 'v2' , 'test', 'test_blur'
     show_enabled=False
     
     filename_method={}
@@ -89,11 +75,11 @@ if __name__ == '__main__':
     pcafile_name='pca_52_by_957032_augmented_X2.pickle'
     
     if dataset_name=='v1' or dataset_name=='v2':
-        load_filepath_imgs='/home/yong/ssd/dataset/blurHand20/'+dataset_name+'/images/'
-        load_filepath_preprocess='/home/yong/ssd/dataset/preprocessed_blurHand20/'+dataset_name+'/'
+        load_filepath_imgs=basedir+'..\\datasets\\blurHand20\\'+dataset_name+'\\images\\'
+        load_filepath_preprocess=basedir+'..\\datasets\\preprocessed_blurHand20\\'+dataset_name+'\\'
     elif dataset_name=='test' or dataset_name=='test_blur':
-        load_filepath_imgs="/home/yong/ssd/dataset/depth_ir/"+dataset_name+"/" 
-        load_filepath_preprocess='/home/yong/ssd/dataset/preprocessed_HIG/'+dataset_name+'/'
+        load_filepath_imgs=basedir+"..\\datasets\\depth_ir\\"+dataset_name+"\\" 
+        load_filepath_preprocess=basedir+'..\\datasets\\preprocessed_HIG\\'+dataset_name+'\\'
 
 
     #--save file path
@@ -127,7 +113,7 @@ if __name__ == '__main__':
    #--HIG net setting
     if not 'pix2pix' in locals():
         pix2pix=Pix2pix(args) 
-        checkpoint=torch.load(trained_modelFile_hig)
+        checkpoint=torch.load(trained_modelFile_hig,map_location=lambda storage, loc: storage)
 
         if 'hig' in args.use_net:
             pix2pix.netG.load_state_dict(checkpoint['state_dict_hig'])
@@ -140,29 +126,29 @@ if __name__ == '__main__':
         if not 'hpe1' in locals():
             hpe_numBlocks=5
             hpe1=dpnet(args.skeleton_pca_dim,hpe_numBlocks,device)
-            checkpoint=torch.load(trained_modelFile_hpe1)
+            checkpoint=torch.load(trained_modelFile_hpe1,map_location=lambda storage, loc: storage)
             hpe1.load_state_dict(checkpoint['state_dict_hpe1'])
     else:
         if not 'hpe1' in locals():
             hpe_numBlocks=5
             hpe1=dpnet(args.skeleton_pca_dim,hpe_numBlocks,device)
-            checkpoint=torch.load(trained_modelFile_hpe1_orig)
+            checkpoint=torch.load(trained_modelFile_hpe1_orig,map_location=lambda storage, loc: storage)
             hpe1.load_state_dict(checkpoint['state_dict'])
             
     #--HPE_orig net setting 
     if not 'hpe1_orig' in locals():
         hpe_numBlocks=5
         hpe1_orig=dpnet(args.skeleton_pca_dim,hpe_numBlocks,device)
-        checkpoint=torch.load(trained_modelFile_hpe1_orig)
+        checkpoint=torch.load(trained_modelFile_hpe1_orig,map_location=lambda storage, loc: storage)
         hpe1_orig.load_state_dict(checkpoint['state_dict'])
                 
     #--HPE2 net setting
     if not 'hpe2' in locals():
         hpe2=dpnet(args.skeleton_pca_dim,hpe_numBlocks,device)
-        checkpoint=torch.load(trained_modelFile_hpe2)
+        checkpoint=torch.load(trained_modelFile_hpe2,map_location=lambda storage, loc: storage)
         hpe2.load_state_dict(checkpoint['state_dict_hpe2'])
                    
-    with open('/home/yong/ssd/dataset/HANDS17/training/preprocessed/'+pcafile_name,'rb') as f:
+    with open(basedir+'..\\pca_52_by_957032_augmented_X2.pickle','rb') as f:
         pca=pickle.load(f)
     
     #--fusion net setting
@@ -205,9 +191,9 @@ if __name__ == '__main__':
     utils=datasetloader_uvr.utils
      
     if dataset_name=='v1' or dataset_name=='v2':
-        loadpath_dict="/home/yong/ssd/dataset/preprocessed_blurHand20/dataset_dict_"+dataset_name+".pickle"
+        loadpath_dict=basedir+"..\\datasets\\preprocessed_blurHand20\\dataset_dict_"+dataset_name+".pickle"
     elif dataset_name=='test' or dataset_name=='test_blur':
-        loadpath_dict="/home/yong/ssd/dataset/preprocessed_HIG/dataset_dict_"+dataset_name+".pickle"
+        loadpath_dict=basedir+"..\\datasets\\preprocessed_HIG\\dataset_dict_"+dataset_name+".pickle"
         
     with open(loadpath_dict,'rb') as f:
         dataset_load=pickle.load(f)   
@@ -297,19 +283,6 @@ if __name__ == '__main__':
             vis.convertTo3cInputImages('hpe2')
             '''
             
-            
-            '''
-            if frame==2002 or frame==2080 or frame==2121 or frame==6245 or frame==7198:
-                #depth_seg (for visualization)
-                depth_orig[depth_orig>d_maximum]=0
-                mask=np.zeros(depth_orig.shape,np.uint16)
-                mask[window[2]:window[3],window[0]:window[1]]=1
-                depth_orig=depth_orig*mask
-            
-                #ir_seg (for visualization)         
-                ir_orig=Grabcut.segment_grabcut(ir_orig,depth_orig,com,window,d_maximum)#0.6      
-            '''
-                       
             vis.set_outputimg('hpe1_orig',depth_orig)
             vis.set_outputimg('hig_hpe1',ir_orig)
             vis.set_outputimg('hpe2',ir_orig)

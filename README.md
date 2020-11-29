@@ -2,7 +2,7 @@
 This project implements the codes for the paper '3D Hand Pose Estimation with a Single Infrared Camera via Domain Transfer Learning' published in ISMAR'20.
 
 # Install python dependencies
-conda env create -f environment.yml
+`conda env create -f environment.yml`
 
 # Pretrained models
 You can download the pretrained models in the following link:
